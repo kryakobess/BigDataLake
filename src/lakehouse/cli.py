@@ -5,7 +5,17 @@ from datetime import date
 from pathlib import Path
 
 from lakehouse.bronze import run_bronze
-from lakehouse.config import BronzeConfig, GoldConfig, MLConfig, ReportPlotsConfig, SilverConfig
+from lakehouse.config import (
+    BronzeConfig,
+    DeltaOptimizeConfig,
+    DeltaTimeTravelConfig,
+    DeltaVacuumConfig,
+    GoldConfig,
+    MLConfig,
+    ReportPlotsConfig,
+    SilverConfig,
+)
+from lakehouse.delta_ops import run_delta_optimize, run_delta_time_travel, run_delta_vacuum
 from lakehouse.gold import run_gold
 from lakehouse.silver import run_silver
 
@@ -65,6 +75,35 @@ def main() -> int:
             output_dir=Path(args.output_dir),
         )
         run_report_plots(config)
+        return 0
+
+    if args.command == "delta-optimize":
+        config = DeltaOptimizeConfig(
+            source_uri=args.source,
+            z_order_columns=parse_csv_items(args.z_order_cols),
+            target_size_bytes=megabytes_to_bytes(args.target_size_mb),
+        )
+        run_delta_optimize(config)
+        return 0
+
+    if args.command == "delta-vacuum":
+        config = DeltaVacuumConfig(
+            source_uri=args.source,
+            retention_hours=args.retention_hours,
+            dry_run=not args.execute,
+            enforce_retention_duration=not args.disable_retention_check,
+            full=args.full,
+        )
+        run_delta_vacuum(config)
+        return 0
+
+    if args.command == "delta-time-travel":
+        config = DeltaTimeTravelConfig(
+            source_uri=args.source,
+            version=args.version,
+            limit=args.limit,
+        )
+        run_delta_time_travel(config)
         return 0
 
     parser.print_help()
@@ -196,6 +235,80 @@ def build_parser() -> argparse.ArgumentParser:
         help="Directory where report figures will be saved.",
     )
 
+    delta_optimize_parser = subparsers.add_parser(
+        "delta-optimize",
+        help="Run Delta OPTIMIZE compaction and optional Z-ORDER on a table.",
+    )
+    delta_optimize_parser.add_argument(
+        "--source",
+        default="data/lakehouse/bronze/flights",
+        help="Target Delta table URI.",
+    )
+    delta_optimize_parser.add_argument(
+        "--z-order-cols",
+        default=None,
+        help="Optional comma-separated list of columns for Z-ORDER, for example source_date,origin,dest.",
+    )
+    delta_optimize_parser.add_argument(
+        "--target-size-mb",
+        type=int,
+        default=None,
+        help="Optional target file size in megabytes for OPTIMIZE.",
+    )
+
+    delta_vacuum_parser = subparsers.add_parser(
+        "delta-vacuum",
+        help="Run Delta VACUUM on a table.",
+    )
+    delta_vacuum_parser.add_argument(
+        "--source",
+        default="data/lakehouse/bronze/flights",
+        help="Target Delta table URI.",
+    )
+    delta_vacuum_parser.add_argument(
+        "--retention-hours",
+        type=int,
+        default=168,
+        help="Retention period in hours.",
+    )
+    delta_vacuum_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually delete stale files. Without this flag VACUUM runs in dry-run mode.",
+    )
+    delta_vacuum_parser.add_argument(
+        "--disable-retention-check",
+        action="store_true",
+        help="Disable the minimum retention duration safety check.",
+    )
+    delta_vacuum_parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Scan the full table directory during VACUUM.",
+    )
+
+    delta_time_travel_parser = subparsers.add_parser(
+        "delta-time-travel",
+        help="Read a historical Delta table version and print a sample.",
+    )
+    delta_time_travel_parser.add_argument(
+        "--source",
+        default="data/lakehouse/bronze/flights",
+        help="Target Delta table URI.",
+    )
+    delta_time_travel_parser.add_argument(
+        "--version",
+        type=int,
+        required=True,
+        help="Historical Delta version to load.",
+    )
+    delta_time_travel_parser.add_argument(
+        "--limit",
+        type=int,
+        default=5,
+        help="Number of rows to show from the historical snapshot.",
+    )
+
     return parser
 
 
@@ -211,3 +324,16 @@ def parse_dates(value: str | None) -> list[date] | None:
         return None
     dates = [item.strip() for item in value.split(",") if item.strip()]
     return [date.fromisoformat(item) for item in dates]
+
+
+def parse_csv_items(value: str | None) -> list[str] | None:
+    if value is None:
+        return None
+    items = [item.strip() for item in value.split(",") if item.strip()]
+    return items or None
+
+
+def megabytes_to_bytes(value: int | None) -> int | None:
+    if value is None:
+        return None
+    return value * 1024 * 1024
