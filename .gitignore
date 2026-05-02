@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+data/
+logs/*.log
+mlruns/flight_data_2018_2024.csv

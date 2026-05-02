@@ -1,0 +1,28 @@
+[project]
+name = "bigdatalake"
+version = "0.1.0"
+description = "Lakehouse pipeline for US flight delays on Polars + Delta Lake"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "deltalake>=0.25.0",
+  "matplotlib>=3.9.0",
+  "mlflow>=2.22.0",
+  "pandas>=2.2.3",
+  "polars>=1.29.0",
+  "pyarrow>=20.0.0",
+  "scikit-learn>=1.6.1",
+]
+
+[project.scripts]
+lakehouse = "lakehouse.cli:main"
+
+[build-system]
+requires = ["setuptools>=69.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

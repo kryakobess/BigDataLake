@@ -1,0 +1,46 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lakehouse-app
+    working_dir: /app
+    command: ["sleep", "infinity"]
+    depends_on:
+      - mlflow
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes:
+      - .:/app
+
+  mlflow:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lakehouse-mlflow
+    working_dir: /app
+    command:
+      [
+        "mlflow",
+        "server",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "5000",
+        "--backend-store-uri",
+        "sqlite:////mlflow/mlflow.db",
+        "--artifacts-destination",
+        "/mlflow/artifacts",
+        "--serve-artifacts",
+        "--allowed-hosts",
+        "localhost,localhost:5001,127.0.0.1,127.0.0.1:5001,mlflow:5000,lakehouse-mlflow:5000",
+        "--cors-allowed-origins",
+        "http://localhost:5001,http://127.0.0.1:5001"
+      ]
+    ports:
+      - "5001:5000"
+    volumes:
+      - mlflow_data:/mlflow
+
+volumes:
+  mlflow_data:

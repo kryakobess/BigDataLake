@@ -1,0 +1,10 @@
+.git
+.idea
+.venv
+__pycache__
+*.pyc
+data
+logs
+mlruns
+reports
+flight_data_2018_2024.csv
